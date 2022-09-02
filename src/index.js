@@ -1,12 +1,12 @@
-import express from "express";
-import cors from "cors";
-import * as dayjs from "dayjs";
-import joi from "joi";
-import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 dotenv.config();
+import express from "express";
+import cors from "cors";
+import dayjs from "dayjs";
+import joi from "joi";
+import { MongoClient, ObjectId } from "mongodb";
 
-const mongoClient = new MongoClient("mongodb://localhost:27017");
+const mongoClient = new MongoClient(process.env.MONGO_URI);
 let db;
 mongoClient.connect(() => {
 	db = mongoClient.db("batepapo-uol");
@@ -17,29 +17,45 @@ app.use(express.json());
 app.use(cors());
 
 const nameSchema = joi.object({
-	name: joi.string().required(),
+	name: joi.string().required().trim(),
 	lastStatus: joi.number(),
 });
+
+async function isThereAName(name) {
+	const participants = await db.collection("participants").find().toArray();
+	if (participants.filter((el) => el.name === name).length > 0) {
+		return true;
+	}
+	return false;
+}
 
 app.post("/participants", async (req, res) => {
 	try {
 		const { name } = req.body;
-		const newUser = { name, lastStatus: Date.now() };
-
+		const newUser = { name: name.trim(), lastStatus: Date.now() };
 		const validation = nameSchema.validate(newUser, { abortEarly: true });
+		const newStatus = {
+			from: name.trim(),
+			to: "Todos",
+			text: "entra na sala...",
+			type: "status",
+			time: dayjs().format("HH:MM:ss"),
+		};
 
 		if (validation.error) {
-			console.log(validation.error.details);
+			console.log(validation.error.message);
 			return res.sendStatus(422);
 		}
 
-		/* if (await db.collection("customers").find().toArray().forEach()){
-			return res.sendStatus(409)
-		} */
+		if ((await isThereAName(name.trim())) === true) {
+			return res.sendStatus(409);
+		}
 
 		await db.collection("participants").insertOne(newUser);
+		await db.collection("messages").insertOne(newStatus);
 		res.sendStatus(201);
 	} catch (err) {
+		console.error(err);
 		res.sendStatus(500);
 	}
 });
@@ -74,9 +90,15 @@ app.post("/messages", (req, res) => {
 	res.sendStatus(422);
 });
 
-app.get("/messages", (req, res) => {
-	const { limit } = req.query;
-	const User = req.headers.User;
+app.get("/messages", async (req, res) => {
+	try {
+		const { limit } = req.query;
+		const User = req.headers.User;
+		const messages = await db.collection("messages").find().toArray();
+		res.send(messages);
+	} catch (err) {
+		res.sendStatus(500);
+	}
 });
 
 app.post("/status", (req, res) => {
