@@ -21,6 +21,14 @@ const nameSchema = joi.object({
 	lastStatus: joi.number(),
 });
 
+const messageSchema = joi.object({
+	to: joi.string().required().trim(),
+	text: joi.string().required(),
+	from: joi.string().required().trim(),
+	type: joi.string().required().trim().valid("message", "private_message"),
+	time: joi.string(),
+});
+
 async function isThereAName(name) {
 	const participants = await db.collection("participants").find().toArray();
 	if (participants.filter((el) => el.name === name).length > 0) {
@@ -39,8 +47,9 @@ app.post("/participants", async (req, res) => {
 			to: "Todos",
 			text: "entra na sala...",
 			type: "status",
-			time: dayjs().format("HH:MM:ss"),
+			time: dayjs().format("HH:mm:ss"),
 		};
+		console.log(name);
 
 		if (validation.error) {
 			console.log(validation.error.message);
@@ -69,33 +78,56 @@ app.get("/participants", async (req, res) => {
 	}
 });
 
-app.post("/messages", (req, res) => {
-	const { to, text, type } = req.body;
-	const from = req.headers.User;
+app.post("/messages", async (req, res) => {
+	try {
+		const { to, text, type } = req.body;
+		const from = req.headers.user;
+		const newMessage = {
+			from: from.trim(),
+			to,
+			text,
+			type,
+			time: dayjs().format("HH:mm:ss"),
+		};
+		const validation = messageSchema.validate(newMessage, { abortEarly: true });
 
-	/* const isFromValidedUSer = participants.find((el) => el.User === from); */
+		console.log(newMessage);
 
-	for (i in participants) {
-		if (to != "" || text != "") {
-			continue;
+		if (validation.error) {
+			console.log(validation.error.message);
+			return res.sendStatus(422);
 		}
-		if (type === "message" || type === "privade_message") {
-			continue;
+
+		if ((await isThereAName(from)) === false) {
+			return res.sendStatus(422);
 		}
-		if (from === participants[i].name) {
-			return res.sendStatus(201);
-		}
+
+		await db.collection("messages").insertOne(newMessage);
+		res.sendStatus(201);
+	} catch (err) {
+		console.error(err);
+		res.sendStatus(500);
 	}
-
-	res.sendStatus(422);
 });
 
 app.get("/messages", async (req, res) => {
 	try {
 		const { limit } = req.query;
-		const User = req.headers.User;
+		const { user } = req.headers;
 		const messages = await db.collection("messages").find().toArray();
-		res.send(messages);
+		const filteredMensages = messages.filter(
+			(el) =>
+				el.from === user ||
+				el.to === user ||
+				el.type === "message" ||
+				el.type === "status",
+		);
+
+		if (limit) {
+			return res.send(filteredMensages.slice(-limit));
+		}
+
+		res.send(filteredMensages);
 	} catch (err) {
 		res.sendStatus(500);
 	}
