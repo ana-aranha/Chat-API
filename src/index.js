@@ -74,6 +74,7 @@ app.get("/participants", async (req, res) => {
 		const participants = await db.collection("participants").find().toArray();
 		res.send(participants);
 	} catch (err) {
+		console.error(err);
 		res.sendStatus(500);
 	}
 });
@@ -129,20 +130,36 @@ app.get("/messages", async (req, res) => {
 
 		res.send(filteredMensages);
 	} catch (err) {
+		console.error(err);
 		res.sendStatus(500);
 	}
 });
 
-app.post("/status", (req, res) => {
-	const User = req.headers.User;
+app.post("/status", async (req, res) => {
+	try {
+		const { user } = req.headers;
+		const newStatus = { lastStatus: Date.now() };
 
-	const isFromValidedUSer = participants.find((el) => el.User === from);
+		if ((await isThereAName(user.trim())) === false) {
+			return res.sendStatus(404);
+		}
 
-	if (isFromValidedUSer) {
-		return res.sendStatus(200);
+		const selectedUser = await db
+			.collection("participants")
+			.findOne({ name: user });
+
+		await db.collection("participants").updateOne(
+			{
+				lastStatus: selectedUser.lastStatus,
+			},
+			{ $set: newStatus },
+		);
+
+		res.sendStatus(200);
+	} catch (err) {
+		console.error(err);
+		res.sendStatus(500);
 	}
-
-	res.sendStatus(404);
 });
 
 app.listen(5000, () => {
