@@ -29,6 +29,13 @@ const messageSchema = joi.object({
 	time: joi.string(),
 });
 
+const editMessageSchema = joi.object({
+	to: joi.string().required().trim(),
+	text: joi.string().required(),
+	from: joi.string().required().trim(),
+	type: joi.string().required().trim().valid("message", "private_message"),
+});
+
 async function isThereAName(name) {
 	const participants = await db.collection("participants").find().toArray();
 	if (participants.filter((el) => el.name === name).length > 0) {
@@ -136,7 +143,6 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 	try {
 		const id = req.params.ID_DA_MENSAGEM;
 		const { user } = req.headers;
-		console.log(id, user);
 		const message = await db
 			.collection("messages")
 			.findOne({ _id: new ObjectId(id) });
@@ -146,6 +152,53 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 		}
 
 		await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
+		res.sendStatus(200);
+	} catch (error) {
+		res.sendStatus(404);
+	}
+});
+
+app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+	try {
+		const id = req.params.ID_DA_MENSAGEM;
+		const from = req.headers.user;
+		const { to, text, type } = req.body;
+		const newMessage = {
+			from: from.trim(),
+			to,
+			text,
+			type,
+		};
+		const message = await db
+			.collection("messages")
+			.findOne({ _id: ObjectId(id) });
+
+		const validation = editMessageSchema.validate(newMessage, {
+			abortEarly: true,
+		});
+
+		if (validation.error) {
+			console.log(validation.error.message);
+			return res.sendStatus(422);
+		}
+
+		if ((await isThereAName(from)) === false) {
+			return res.sendStatus(422);
+		}
+
+		if (message.from != from) {
+			return res.sendStatus(401);
+		}
+
+		await db.collection("messages").updateOne(
+			{
+				to: message.to,
+				text: message.text,
+				type: message.type,
+			},
+			{ $set: newMessage },
+		);
+
 		res.sendStatus(200);
 	} catch (error) {
 		res.sendStatus(404);
