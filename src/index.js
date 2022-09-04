@@ -26,14 +26,6 @@ const messageSchema = joi.object({
 	text: joi.string().required(),
 	from: joi.string().required().trim(),
 	type: joi.string().required().trim().valid("message", "private_message"),
-	time: joi.string(),
-});
-
-const editMessageSchema = joi.object({
-	to: joi.string().required().trim(),
-	text: joi.string().required(),
-	from: joi.string().required().trim(),
-	type: joi.string().required().trim().valid("message", "private_message"),
 });
 
 async function isThereAName(name) {
@@ -94,9 +86,10 @@ app.post("/messages", async (req, res) => {
 			to,
 			text,
 			type,
-			time: dayjs().format("HH:mm:ss"),
 		};
-		const validation = messageSchema.validate(newMessage, { abortEarly: true });
+		const validation = messageSchema.validate(newMessage, {
+			abortEarly: true,
+		});
 
 		if (validation.error) {
 			console.log(validation.error.message);
@@ -107,7 +100,9 @@ app.post("/messages", async (req, res) => {
 			return res.sendStatus(422);
 		}
 
-		await db.collection("messages").insertOne(newMessage);
+		await db
+			.collection("messages")
+			.insertOne({ ...newMessage, time: dayjs().format("HH:mm:ss") });
 		res.sendStatus(201);
 	} catch (err) {
 		console.error(err);
@@ -173,7 +168,7 @@ app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 			.collection("messages")
 			.findOne({ _id: ObjectId(id) });
 
-		const validation = editMessageSchema.validate(newMessage, {
+		const validation = messageSchema.validate(newMessage, {
 			abortEarly: true,
 		});
 
