@@ -232,7 +232,7 @@ app.post("/status", async (req, res) => {
 	}
 });
 
-//setInterval(deleteInativatedUsers, 15000);
+setInterval(deleteInativatedUsers, 15000);
 
 async function deleteInativatedUsers() {
 	try {
