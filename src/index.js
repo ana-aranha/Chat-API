@@ -132,6 +132,26 @@ app.get("/messages", async (req, res) => {
 	}
 });
 
+app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
+	try {
+		const id = req.params.ID_DA_MENSAGEM;
+		const { user } = req.headers;
+		console.log(id, user);
+		const message = await db
+			.collection("messages")
+			.findOne({ _id: new ObjectId(id) });
+
+		if (message.from != user) {
+			return res.sendStatus(401);
+		}
+
+		await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
+		res.sendStatus(200);
+	} catch (error) {
+		res.sendStatus(404);
+	}
+});
+
 app.post("/status", async (req, res) => {
 	try {
 		const { user } = req.headers;
@@ -159,7 +179,7 @@ app.post("/status", async (req, res) => {
 	}
 });
 
-setInterval(deleteInativatedUsers, 15000);
+//setInterval(deleteInativatedUsers, 15000);
 
 async function deleteInativatedUsers() {
 	try {
