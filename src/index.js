@@ -49,7 +49,6 @@ app.post("/participants", async (req, res) => {
 			type: "status",
 			time: dayjs().format("HH:mm:ss"),
 		};
-		console.log(name);
 
 		if (validation.error) {
 			console.log(validation.error.message);
@@ -91,8 +90,6 @@ app.post("/messages", async (req, res) => {
 			time: dayjs().format("HH:mm:ss"),
 		};
 		const validation = messageSchema.validate(newMessage, { abortEarly: true });
-
-		console.log(newMessage);
 
 		if (validation.error) {
 			console.log(validation.error.message);
@@ -161,6 +158,33 @@ app.post("/status", async (req, res) => {
 		res.sendStatus(500);
 	}
 });
+
+setInterval(deleteInativatedUsers, 15000);
+
+async function deleteInativatedUsers() {
+	try {
+		const participants = await db.collection("participants").find().toArray();
+		const filteredParticipants = participants.filter(
+			(el) => Date.now() - el.lastStatus > 10000,
+		);
+
+		filteredParticipants.forEach((el) => {
+			const newStatus = {
+				from: el.name,
+				to: "Todos",
+				text: "sai da sala...",
+				type: "status",
+				time: dayjs().format("HH:mm:ss"),
+			};
+
+			db.collection("participants").deleteOne({ _id: ObjectId(el._id) });
+			db.collection("messages").insertOne(newStatus);
+		});
+	} catch (err) {
+		console.log(err);
+		res.sendStatus(500);
+	}
+}
 
 app.listen(5000, () => {
 	console.log("Listening on port 5000");
