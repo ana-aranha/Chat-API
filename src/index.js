@@ -28,19 +28,14 @@ const messageSchema = joi.object({
 	type: joi.string().required().trim().valid("message", "private_message"),
 });
 
-async function isThereAName(name) {
-	const participants = await db.collection("participants").find().toArray();
-	if (participants.filter((el) => el.name === name).length > 0) {
-		return true;
-	}
-	return false;
-}
-
 app.post("/participants", async (req, res) => {
 	try {
 		const { name } = req.body;
 		const newUser = { name: name.trim(), lastStatus: Date.now() };
 		const validation = nameSchema.validate(newUser, { abortEarly: true });
+		const invalidName = await db
+			.collection("participants")
+			.findOne({ name: name });
 		const newStatus = {
 			from: name.trim(),
 			to: "Todos",
@@ -54,7 +49,7 @@ app.post("/participants", async (req, res) => {
 			return res.sendStatus(422);
 		}
 
-		if ((await isThereAName(name.trim())) === true) {
+		if (invalidName) {
 			return res.sendStatus(409);
 		}
 
@@ -81,6 +76,9 @@ app.post("/messages", async (req, res) => {
 	try {
 		const { to, text, type } = req.body;
 		const from = req.headers.user;
+		const validFrom = await db
+			.collection("participants")
+			.findOne({ name: from });
 		const newMessage = {
 			from: from.trim(),
 			to,
@@ -96,7 +94,7 @@ app.post("/messages", async (req, res) => {
 			return res.sendStatus(422);
 		}
 
-		if ((await isThereAName(from)) === false) {
+		if (!validFrom) {
 			return res.sendStatus(422);
 		}
 
@@ -158,6 +156,9 @@ app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 		const id = req.params.ID_DA_MENSAGEM;
 		const from = req.headers.user;
 		const { to, text, type } = req.body;
+		const validFrom = await db
+			.collection("participants")
+			.findOne({ name: from });
 		const newMessage = {
 			from: from.trim(),
 			to,
@@ -177,7 +178,7 @@ app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 			return res.sendStatus(422);
 		}
 
-		if ((await isThereAName(from)) === false) {
+		if (!validFrom) {
 			return res.sendStatus(422);
 		}
 
@@ -204,8 +205,11 @@ app.post("/status", async (req, res) => {
 	try {
 		const { user } = req.headers;
 		const newStatus = { lastStatus: Date.now() };
+		const validUser = await db
+			.collection("participants")
+			.findOne({ name: user });
 
-		if ((await isThereAName(user.trim())) === false) {
+		if (!validUser) {
 			return res.sendStatus(404);
 		}
 
