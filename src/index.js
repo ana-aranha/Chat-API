@@ -4,6 +4,8 @@ import express from "express";
 import cors from "cors";
 import dayjs from "dayjs";
 import joi from "joi";
+import { strict as assert } from "assert";
+import { stripHtml } from "string-strip-html";
 import { MongoClient, ObjectId } from "mongodb";
 
 const mongoClient = new MongoClient(process.env.MONGO_URI);
@@ -28,10 +30,18 @@ const messageSchema = joi.object({
 	type: joi.string().required().trim().valid("message", "private_message"),
 });
 
+assert.equal(
+	stripHtml(`Some text <b>and</b> text.`).result,
+	`Some text and text.`,
+);
+
 app.post("/participants", async (req, res) => {
 	try {
-		const { name } = req.body;
-		const newUser = { name: name.trim(), lastStatus: Date.now() };
+		const name = stripHtml(req.body.name).result;
+		const newUser = {
+			name: name.trim(),
+			lastStatus: Date.now(),
+		};
 		const validation = nameSchema.validate(newUser, { abortEarly: true });
 		const invalidName = await db
 			.collection("participants")
@@ -74,8 +84,10 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
 	try {
-		const { to, text, type } = req.body;
-		const from = req.headers.user;
+		const to = stripHtml(req.body.to).result;
+		const text = stripHtml(req.body.text).result;
+		const type = stripHtml(req.body.type).result;
+		const from = stripHtml(req.headers.user).result;
 		const validFrom = await db
 			.collection("participants")
 			.findOne({ name: from });
@@ -135,7 +147,7 @@ app.get("/messages", async (req, res) => {
 app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 	try {
 		const id = req.params.ID_DA_MENSAGEM;
-		const { user } = req.headers;
+		const user = stripHtml(req.headers.user).result;
 		const message = await db
 			.collection("messages")
 			.findOne({ _id: new ObjectId(id) });
@@ -154,8 +166,10 @@ app.delete("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 	try {
 		const id = req.params.ID_DA_MENSAGEM;
-		const from = req.headers.user;
-		const { to, text, type } = req.body;
+		const from = stripHtml(req.headers.user).result;
+		const to = stripHtml(req.body.to).result;
+		const text = stripHtml(req.body.text).result;
+		const type = stripHtml(req.body.type).result;
 		const validFrom = await db
 			.collection("participants")
 			.findOne({ name: from });
@@ -203,7 +217,7 @@ app.put("/messages/:ID_DA_MENSAGEM", async (req, res) => {
 
 app.post("/status", async (req, res) => {
 	try {
-		const { user } = req.headers;
+		const user = stripHtml(req.headers.user).result;
 		const newStatus = { lastStatus: Date.now() };
 		const validUser = await db
 			.collection("participants")
