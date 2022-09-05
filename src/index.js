@@ -236,22 +236,20 @@ setInterval(deleteInativatedUsers, 15000);
 async function deleteInativatedUsers() {
 	try {
 		const participants = await db.collection("participants").find().toArray();
-		const filteredParticipants = participants.filter(
-			(el) => Date.now() - el.lastStatus > 10000,
-		);
+		participants
+			.filter((el) => Date.now() - el.lastStatus > 10000)
+			.forEach((el) => {
+				const newStatus = {
+					from: el.name,
+					to: "Todos",
+					text: "sai da sala...",
+					type: "status",
+					time: dayjs().format("HH:mm:ss"),
+				};
 
-		filteredParticipants.forEach((el) => {
-			const newStatus = {
-				from: el.name,
-				to: "Todos",
-				text: "sai da sala...",
-				type: "status",
-				time: dayjs().format("HH:mm:ss"),
-			};
-
-			db.collection("participants").deleteOne({ _id: ObjectId(el._id) });
-			db.collection("messages").insertOne(newStatus);
-		});
+				db.collection("participants").deleteOne({ _id: ObjectId(el._id) });
+				db.collection("messages").insertOne(newStatus);
+			});
 	} catch (err) {
 		console.log(err);
 		res.sendStatus(500);
